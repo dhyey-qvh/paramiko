@@ -123,11 +123,12 @@ class PKey:
     END_TAG = re.compile(r"^-{5}END (RSA|EC|OPENSSH) PRIVATE KEY-{5}\s*$")
 
     @staticmethod
-    def from_path(path, passphrase=None):
+    def from_path(path, password: Optional[str] = None):
         """
         Attempt to instantiate appropriate key subclass from given file path.
 
-        :param Path path: The path to load (may also be a `str`).
+        :param pathlib.Path path: The path to load (may also be a `str`).
+        :param str password: Optional decryption password.
 
         :returns:
             A `PKey` subclass instance.
@@ -136,8 +137,10 @@ class PKey:
             `UnknownKeyType`, if our crypto backend doesn't know this key type.
 
         .. versionadded:: 3.2
+        .. versionchanged:: 5.0
+            Renamed ``passphrase`` argument to ``password`` for consistency
+            with older methods.
         """
-        # TODO: make sure sphinx is reading Path right in param list...
 
         # Lazy import to avoid circular import issues
         from paramiko import RSAKey, Ed25519Key, ECDSAKey
@@ -163,12 +166,12 @@ class PKey:
         # Like OpenSSH, try modern/OpenSSH-specific key load first
         try:
             loaded = serialization.load_ssh_private_key(
-                data=data, password=passphrase
+                data=data, password=password
             )
         # Then fall back to assuming legacy PEM type
         except ValueError:
             loaded = serialization.load_pem_private_key(
-                data=data, password=passphrase
+                data=data, password=password
             )
         # TODO Python 3.10: match statement? (NOTE: we cannot use a dict
         # because the results from the loader are literal backend, eg openssl,
@@ -188,7 +191,7 @@ class PKey:
         else:
             raise UnknownKeyType(key_bytes=data, key_type=loaded.__class__)
         with key_path.open() as fd:
-            key = key_class.from_private_key(fd, password=passphrase)
+            key = key_class.from_private_key(fd, password=password)
         if cert_path.exists():
             # load_certificate can take Message, path-str, or value-str
             key.load_certificate(str(cert_path))

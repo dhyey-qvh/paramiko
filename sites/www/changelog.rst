@@ -2,6 +2,14 @@
 Changelog
 =========
 
+- :support:`-` Renamed `PKey.from_path <paramiko.pkey.PKey.from_path>`'s
+  ``passphrase`` argument to ``password`` so it's consistent with all the other
+  methods of instantiating PKey objects.
+
+    .. warning::
+        This change is backwards incompatible if you were using this relatively
+        new constructor + were doing so to load encrypted keys.
+
 - :support:`-` Removed the ``demos/`` folder; they've become too big a support
   burden and we've wanted to remove them for years.
 
