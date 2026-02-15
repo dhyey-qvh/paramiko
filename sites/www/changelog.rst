@@ -2,6 +2,15 @@
 Changelog
 =========
 
+- :support:`-` Removed the ``demos/`` folder; they've become too big a support
+  burden and we've wanted to remove them for years.
+
+  Users who enjoyed the client-side demos should look at our wrapper library,
+  `Fabric <https://fabfile.org>`.
+
+  We suspect the most-used demo was ``demos/demo-server.py`` and may consider
+  adding a variant of it to the actual Python package in future.
+
 - :release:`4.0.0 <2025-08-03>`
 - :support:`-` Administrivia update:
 
