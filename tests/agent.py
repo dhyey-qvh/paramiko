@@ -1,6 +1,6 @@
 from unittest.mock import Mock
 
-from pytest import mark, raises
+from pytest import mark, raises, skip
 
 from paramiko import AgentKey, Message, RSAKey
 from paramiko.agent import (
@@ -85,6 +85,8 @@ class AgentKey_:
             assert _BareAgentKey(name=None, blob=blob).asbytes() is blob
 
         def defers_to_inner_key_when_present(self, keys):
+            if keys.pkey_with_cert is None:
+                skip()
             key = AgentKey(agent=None, blob=keys.pkey_with_cert.asbytes())
             # Artificially make outer key blob != inner key blob; comment in
             # AgentKey.asbytes implies this can sometimes really happen but I
