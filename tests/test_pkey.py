@@ -44,7 +44,7 @@ from paramiko import (
 from paramiko.common import byte_chr, o600
 from paramiko.util import b
 
-from ._util import _support, is_low_entropy, requires_sha1_signing
+from ._util import _support, is_low_entropy
 
 # from openssh's ssh-keygen
 PUB_RSA = "ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAIEA049W6geFpmsljTwfvI1UmKWWJPNFI74+vNKTk4dmzkQY2yAMs6FhlvhlI8ysU4oj71ZsRYMecHbBbxdN79+JRFVYTKaLqjwGENeTd+yv4q+V2PvZv3fLnzApI3l7EJCqhWwJUHJ1jAkZzqDx0tyOL4uoZpww3nmE0kb3y21tH4c="  # noqa
@@ -198,18 +198,14 @@ class KeyTest(unittest.TestCase):
         pub = RSAKey(data=key.asbytes())
         self.assertTrue(pub.verify_ssh_sig(b"ice weasels", msg))
 
-    @requires_sha1_signing
-    def test_sign_and_verify_ssh_rsa(self):
-        self._sign_and_verify_rsa("ssh-rsa", SIGNED_RSA)
-
     def test_sign_and_verify_rsa_sha2_512(self):
         self._sign_and_verify_rsa("rsa-sha2-512", SIGNED_RSA_512)
 
     def test_sign_and_verify_rsa_sha2_256(self):
         self._sign_and_verify_rsa("rsa-sha2-256", SIGNED_RSA_256)
 
-    @requires_sha1_signing
     def test_generate_rsa(self):
+        # TODO: this probs needs to be larger number now
         key = RSAKey.generate(1024)
         msg = key.sign_ssh_data(b"jerri blank")
         msg.rewind()

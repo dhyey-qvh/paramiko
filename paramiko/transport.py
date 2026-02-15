@@ -204,7 +204,6 @@ class Transport(threading.Thread, ClosingContextManager):
         "ecdsa-sha2-nistp521",
         "rsa-sha2-512",
         "rsa-sha2-256",
-        "ssh-rsa",
     )
     # ~= PubkeyAcceptedAlgorithms
     _preferred_pubkeys = (
@@ -214,7 +213,6 @@ class Transport(threading.Thread, ClosingContextManager):
         "ecdsa-sha2-nistp521",
         "rsa-sha2-512",
         "rsa-sha2-256",
-        "ssh-rsa",
     )
     _preferred_kex = (
         "ecdh-sha2-nistp256",
@@ -307,12 +305,18 @@ class Transport(threading.Thread, ClosingContextManager):
     }
 
     _key_info = {
-        # TODO: at some point we will want to drop this as it's no longer
-        # considered secure due to using SHA-1 for signatures. OpenSSH 8.8 no
-        # longer supports it. Question becomes at what point do we want to
-        # prevent users with older setups from using this?
-        "ssh-rsa": RSAKey,
-        "ssh-rsa-cert-v01@openssh.com": RSAKey,
+        # TODO: do some downstream uses of this need to be able to 'see'
+        # ssh-rsa in not-using-SHA1 contexts?
+        # TODO: NO!!! good.
+        # TODO: it's used in:
+        # - Transport._verify_key - verification - do not want ssh-rsa
+        # - SecurityOptions - only really uses this as a filter for what's
+        # allowed to be overwritten into its .key_types (which ==
+        # transport._preferred_keys), and since the latter doesn't want ssh-rsa
+        # in it, this use case doesn't require that string in here either.
+        # - AuthHandler._generate_key_from_request - server-side auth
+        # support - is looking at the 'algorithm' field in the request when it
+        # references this structure, so yup, do not want ssh-rsa
         "rsa-sha2-256": RSAKey,
         "rsa-sha2-256-cert-v01@openssh.com": RSAKey,
         "rsa-sha2-512": RSAKey,
@@ -1396,11 +1400,13 @@ class Transport(threading.Thread, ClosingContextManager):
             # TODO: a more robust implementation would be to ask each key class
             # for its nameS plural, and just use that.
             # TODO: that could be used in a bunch of other spots too
+            # TODO: don't we have that now, lol
+            # TODO: either way this is ~= like using SecurityOptions.key_types
+            # = xxx, but different, which sucks sigh
             if isinstance(hostkey, RSAKey):
                 self._preferred_keys = [
                     "rsa-sha2-512",
                     "rsa-sha2-256",
-                    "ssh-rsa",
                 ]
             else:
                 self._preferred_keys = [hostkey.get_name()]
@@ -2002,6 +2008,8 @@ class Transport(threading.Thread, ClosingContextManager):
         key: PKey = self._key_info[self.host_key_type](Message(host_key))
         if key is None:
             raise SSHException("Unknown host key type")
+        # TODO: like, here, can a host offer "ssh-rsa" but request SHA2, or are
+        # those baked in?
         if not key.verify_ssh_sig(self.H, Message(sig)):
             raise SSHException(
                 "Signature verification ({}) failed.".format(
@@ -3232,6 +3240,14 @@ class SecurityOptions:
 
     @key_types.setter
     def key_types(self, x):
+        # TODO: so this reads Transport._key_info.keys(), yells if any values
+        # in `x` /aren't/ in that list, then overwrites
+        # Transport._preferred_keys with `x`...
+        # TODO: so you can read this pretty simply as "replace
+        # transport._preferred_keys with x".
+        # TODO: which is...bad...in cases where SSHClient is trying to simply
+        # load up known_hosts or system known hosts, and use those to determine
+        # which hostkey /algorithms/ it is willing to accept
         self._set("_preferred_keys", "_key_info", x)
 
     @property
