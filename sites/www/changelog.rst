@@ -2,6 +2,21 @@
 Changelog
 =========
 
+- :support:`-` Removed GSSAPI support, as the current (buggy, no longer easily
+  testable in CI, poorly understood and not used by the core team)
+  implementation is SHA-1 based and no SHA-256 upgrade appeared to be
+  forthcoming from contributors.
+
+  We don't like removing functionality, but this feature has been on the rocks
+  for years and it makes sense to remove it as an insecure support burden. We
+  will definitely consider merging a SHA256-based replacement in the future if
+  a high-quality one appears.
+
+  Side note: the GSS related constants in ``paramiko/common.py`` have been left
+  in place as they are essentially mapping out known protocol numbers.
+
+  .. warning:: This change is backwards incompatible if you require GSS.
+
 - :support:`-` Removed support for key exchange using SHA-1, meaning the kex
   methods ``diffie-hellman-group-exchange-sha1``,
   ``diffie-hellman-group14-sha1``, and ``diffie-hellman-group1-sha1`` are now

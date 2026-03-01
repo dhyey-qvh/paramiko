@@ -101,7 +101,6 @@ from paramiko.kex_ecdh_nist import KexNistp256, KexNistp384, KexNistp521
 from paramiko.kex_gex import KexGexSHA256
 from paramiko.kex_group14 import KexGroup14SHA256
 from paramiko.kex_group16 import KexGroup16SHA512
-from paramiko.kex_gss import KexGSSGex, KexGSSGroup1, KexGSSGroup14
 from paramiko.message import Message
 from paramiko.packet import NeedRekeyException, Packetizer
 from paramiko.pkey import PKey
@@ -117,7 +116,6 @@ from paramiko.ssh_exception import (
     ProxyCommandFailure,
     SSHException,
 )
-from paramiko.ssh_gss import GSSAuth
 from paramiko.util import (
     ClosingContextManager,
     b,
@@ -223,11 +221,6 @@ class Transport(threading.Thread, ClosingContextManager):
     )
     if KexCurve25519.is_available():
         _preferred_kex = ("curve25519-sha256@libssh.org",) + _preferred_kex
-    _preferred_gsskex = (
-        "gss-gex-sha1-toWM5Slw5Ew8Mqkay+al2g==",
-        "gss-group14-sha1-toWM5Slw5Ew8Mqkay+al2g==",
-        "gss-group1-sha1-toWM5Slw5Ew8Mqkay+al2g==",
-    )
     _preferred_compression = ("none",)
 
     _cipher_info = {
@@ -331,9 +324,6 @@ class Transport(threading.Thread, ClosingContextManager):
         "diffie-hellman-group-exchange-sha256": KexGexSHA256,
         "diffie-hellman-group14-sha256": KexGroup14SHA256,
         "diffie-hellman-group16-sha512": KexGroup16SHA512,
-        "gss-group1-sha1-toWM5Slw5Ew8Mqkay+al2g==": KexGSSGroup1,
-        "gss-group14-sha1-toWM5Slw5Ew8Mqkay+al2g==": KexGSSGroup14,
-        "gss-gex-sha1-toWM5Slw5Ew8Mqkay+al2g==": KexGSSGex,
         "ecdh-sha2-nistp256": KexNistp256,
         "ecdh-sha2-nistp384": KexNistp384,
         "ecdh-sha2-nistp521": KexNistp521,
@@ -358,8 +348,6 @@ class Transport(threading.Thread, ClosingContextManager):
         sock,
         default_window_size=DEFAULT_WINDOW_SIZE,
         default_max_packet_size=DEFAULT_MAX_PACKET_SIZE,
-        gss_kex=False,
-        gss_deleg_creds=True,
         disabled_algorithms=None,
         server_sig_algs=True,
         strict_kex=True,
@@ -404,12 +392,6 @@ class Transport(threading.Thread, ClosingContextManager):
         :param int default_max_packet_size:
             sets the default max packet size on the transport. (defaults to
             32768)
-        :param bool gss_kex:
-            Whether to enable GSSAPI key exchange when GSSAPI is in play.
-            Default: ``False``.
-        :param bool gss_deleg_creds:
-            Whether to enable GSSAPI credential delegation when GSSAPI is in
-            play. Default: ``True``.
         :param dict disabled_algorithms:
             If given, must be a dictionary mapping algorithm type to an
             iterable of algorithm identifiers, which will be disabled for the
@@ -441,8 +423,6 @@ class Transport(threading.Thread, ClosingContextManager):
         .. versionchanged:: 1.15
             Added the ``default_window_size`` and ``default_max_packet_size``
             arguments.
-        .. versionchanged:: 1.15
-            Added the ``gss_kex`` and ``gss_deleg_creds`` kwargs.
         .. versionchanged:: 2.6
             Added the ``disabled_algorithms`` kwarg.
         .. versionchanged:: 2.9
@@ -510,16 +490,6 @@ class Transport(threading.Thread, ClosingContextManager):
         self.session_id = None
         self.host_key_type = None
         self.host_key = None
-
-        # GSS-API / SSPI Key Exchange
-        self.use_gss_kex = gss_kex
-        # This will be set to True if GSS-API Key Exchange was performed
-        self.gss_kex_used = False
-        self.kexgss_ctxt = None
-        self.gss_host = None
-        if self.use_gss_kex:
-            self.kexgss_ctxt = GSSAuth("gssapi-keyex", gss_deleg_creds)
-            self._preferred_kex = self._preferred_gsskex + self._preferred_kex
 
         # state used during negotiation
         self.kex_engine = None
@@ -676,40 +646,6 @@ class Transport(threading.Thread, ClosingContextManager):
         of preference for them.
         """
         return SecurityOptions(self)
-
-    def set_gss_host(self, gss_host, trust_dns=True, gssapi_requested=True):
-        """
-        Normalize/canonicalize ``self.gss_host`` depending on various factors.
-
-        :param str gss_host:
-            The explicitly requested GSS-oriented hostname to connect to (i.e.
-            what the host's name is in the Kerberos database.) Defaults to
-            ``self.hostname`` (which will be the 'real' target hostname and/or
-            host portion of given socket object.)
-        :param bool trust_dns:
-            Indicates whether or not DNS is trusted; if true, DNS will be used
-            to canonicalize the GSS hostname (which again will either be
-            ``gss_host`` or the transport's default hostname.)
-            (Defaults to True due to backwards compatibility.)
-        :param bool gssapi_requested:
-            Whether GSSAPI key exchange or authentication was even requested.
-            If not, this is a no-op and nothing happens
-            (and ``self.gss_host`` is not set.)
-            (Defaults to True due to backwards compatibility.)
-        :returns: ``None``.
-        """
-        # No GSSAPI in play == nothing to do
-        if not gssapi_requested:
-            return
-        # Obtain the correct host first - did user request a GSS-specific name
-        # to use that is distinct from the actual SSH target hostname?
-        if gss_host is None:
-            gss_host = self.hostname
-        # Finally, canonicalize via DNS if DNS is trusted.
-        if trust_dns and gss_host is not None:
-            gss_host = socket.getfqdn(gss_host)
-        # And set attribute for reference later.
-        self.gss_host = gss_host
 
     def start_client(self, event=None, timeout=None):
         """
@@ -1335,11 +1271,6 @@ class Transport(threading.Thread, ClosingContextManager):
         username="",
         password=None,
         pkey=None,
-        gss_host=None,
-        gss_auth=False,
-        gss_kex=False,
-        gss_deleg_creds=True,
-        gss_trust_dns=True,
     ):
         """
         Negotiate an SSH2 session, and optionally verify the server's host key
@@ -1370,24 +1301,9 @@ class Transport(threading.Thread, ClosingContextManager):
         :param .PKey pkey:
             a private key to use for authentication, if you want to use private
             key authentication; otherwise ``None``.
-        :param str gss_host:
-            The target's name in the kerberos database. Default: hostname
-        :param bool gss_auth:
-            ``True`` if you want to use GSS-API authentication.
-        :param bool gss_kex:
-            Perform GSS-API Key Exchange and user authentication.
-        :param bool gss_deleg_creds:
-            Whether to delegate GSS-API client credentials.
-        :param gss_trust_dns:
-            Indicates whether or not the DNS is trusted to securely
-            canonicalize the name of the host being connected to (default
-            ``True``).
 
         :raises: `.SSHException` -- if the SSH2 negotiation fails, the host key
             supplied by the server is incorrect, or authentication fails.
-
-        .. versionchanged:: 2.3
-            Added the ``gss_trust_dns`` argument.
         """
         if hostkey is not None:
             # TODO: a more robust implementation would be to ask each key class
@@ -1404,18 +1320,10 @@ class Transport(threading.Thread, ClosingContextManager):
             else:
                 self._preferred_keys = [hostkey.get_name()]
 
-        self.set_gss_host(
-            gss_host=gss_host,
-            trust_dns=gss_trust_dns,
-            gssapi_requested=gss_kex or gss_auth,
-        )
-
         self.start_client()
 
         # check host key if we were given one
-        # If GSS-API Key Exchange was performed, we are not required to check
-        # the host key.
-        if (hostkey is not None) and not gss_kex:
+        if hostkey is not None:
             key = self.get_remote_server_key()
             if (
                 key.get_name() != hostkey.get_name()
@@ -1439,18 +1347,8 @@ class Transport(threading.Thread, ClosingContextManager):
                 DEBUG, "Host key verified ({})".format(hostkey.get_name())
             )
 
-        if (pkey is not None) or (password is not None) or gss_auth or gss_kex:
-            if gss_auth:
-                self._log(
-                    DEBUG, "Attempting GSS-API auth... (gssapi-with-mic)"
-                )  # noqa
-                self.auth_gssapi_with_mic(
-                    username, self.gss_host, gss_deleg_creds
-                )
-            elif gss_kex:
-                self._log(DEBUG, "Attempting GSS-API auth... (gssapi-keyex)")
-                self.auth_gssapi_keyex(username)
-            elif pkey is not None:
+        if (pkey is not None) or (password is not None):
+            if pkey is not None:
                 self._log(DEBUG, "Attempting public-key auth...")
                 self.auth_publickey(username, pkey)
             else:
@@ -1776,55 +1674,6 @@ class Transport(threading.Thread, ClosingContextManager):
                 return answers
 
         return self.auth_interactive(username, handler, submethods)
-
-    def auth_gssapi_with_mic(self, username, gss_host, gss_deleg_creds):
-        """
-        Authenticate to the Server using GSS-API / SSPI.
-
-        :param str username: The username to authenticate as
-        :param str gss_host: The target host
-        :param bool gss_deleg_creds: Delegate credentials or not
-        :return: list of auth types permissible for the next stage of
-                 authentication (normally empty)
-        :raises: `.BadAuthenticationType` -- if gssapi-with-mic isn't
-            allowed by the server (and no event was passed in)
-        :raises:
-            `.AuthenticationException` -- if the authentication failed (and no
-            event was passed in)
-        :raises: `.SSHException` -- if there was a network error
-        """
-        if (not self.active) or (not self.initial_kex_done):
-            # we should never try to authenticate unless we're on a secure link
-            raise SSHException("No existing session")
-        my_event = threading.Event()
-        self.auth_handler = AuthHandler(self)
-        self.auth_handler.auth_gssapi_with_mic(
-            username, gss_host, gss_deleg_creds, my_event
-        )
-        return self.auth_handler.wait_for_response(my_event)
-
-    def auth_gssapi_keyex(self, username):
-        """
-        Authenticate to the server with GSS-API/SSPI if GSS-API kex is in use.
-
-        :param str username: The username to authenticate as.
-        :returns:
-            a list of auth types permissible for the next stage of
-            authentication (normally empty)
-        :raises: `.BadAuthenticationType` --
-            if GSS-API Key Exchange was not performed (and no event was passed
-            in)
-        :raises: `.AuthenticationException` --
-            if the authentication failed (and no event was passed in)
-        :raises: `.SSHException` -- if there was a network error
-        """
-        if (not self.active) or (not self.initial_kex_done):
-            # we should never try to authenticate unless we're on a secure link
-            raise SSHException("No existing session")
-        my_event = threading.Event()
-        self.auth_handler = AuthHandler(self)
-        self.auth_handler.auth_gssapi_keyex(username, my_event)
-        return self.auth_handler.wait_for_response(my_event)
 
     def set_log_channel(self, name):
         """
@@ -2404,7 +2253,6 @@ class Transport(threading.Thread, ClosingContextManager):
             self.clear_to_send.clear()
         finally:
             self.clear_to_send_lock.release()
-        self.gss_kex_used = False
         self.in_kex = True
         kex_algos = list(self.preferred_kex)
         if self.server_mode:
@@ -3456,19 +3304,3 @@ class ServiceRequestingTransport(Transport):
                 return answers
 
         return self.auth_interactive(username, handler, submethods)
-
-    def auth_gssapi_with_mic(self, username, gss_host, gss_deleg_creds):
-        # TODO (backwards incompat): merge to parent, preserving (most of)
-        # docstring
-        self.ensure_session()
-        self.auth_handler = self.get_auth_handler()
-        return self.auth_handler.auth_gssapi_with_mic(
-            username, gss_host, gss_deleg_creds
-        )
-
-    def auth_gssapi_keyex(self, username):
-        # TODO (backwards incompat): merge to parent, preserving (most of)
-        # docstring
-        self.ensure_session()
-        self.auth_handler = self.get_auth_handler()
-        return self.auth_handler.auth_gssapi_keyex(username)

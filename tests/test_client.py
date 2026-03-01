@@ -42,10 +42,6 @@ from paramiko.ssh_exception import AuthenticationException, SSHException
 
 from ._util import _support, slow
 
-requires_gss_auth = unittest.skipUnless(
-    paramiko.GSS_AUTH_AVAILABLE, "GSS auth not available"
-)
-
 FINGERPRINTS = {
     # TODO: this should still be ok as it's specifically re: key
     # type/identity.
@@ -220,7 +216,6 @@ class ClientTest(unittest.TestCase):
             self.connect_kwargs["username"], self.ts.get_username()
         )
         self.assertEqual(True, self.ts.is_authenticated())
-        self.assertEqual(False, self.tc.get_transport().gss_kex_used)
 
         # Command execution functions?
         stdin, stdout, stderr = self.tc.exec_command("yes")
@@ -559,22 +554,6 @@ class SSHClientTest(ClientTest):
 
         self.assertRaises(paramiko.SSHException, self.tc.open_sftp)
 
-    @requires_gss_auth
-    def test_auth_trickledown_gsskex(self):
-        """
-        Failed gssapi-keyex doesn't prevent subsequent key from succeeding
-        """
-        kwargs = dict(gss_kex=True, key_filename=[_support("rsa.key")])
-        self._test_connection(**kwargs)
-
-    @requires_gss_auth
-    def test_auth_trickledown_gssauth(self):
-        """
-        Failed gssapi-with-mic doesn't prevent subsequent key from succeeding
-        """
-        kwargs = dict(gss_auth=True, key_filename=[_support("rsa.key")])
-        self._test_connection(**kwargs)
-
     def test_reject_policy(self):
         """
         verify that SSHClient's RejectPolicy works.
@@ -588,27 +567,6 @@ class SSHClientTest(ClientTest):
             paramiko.SSHException,
             self.tc.connect,
             password="pygmalion",
-            **self.connect_kwargs,
-        )
-
-    @requires_gss_auth
-    def test_reject_policy_gsskex(self):
-        """
-        verify that SSHClient's RejectPolicy works,
-        even if gssapi-keyex was enabled but not used.
-        """
-        # Test for a bug present in paramiko versions released before
-        # 2017-08-01
-        threading.Thread(target=self._run).start()
-
-        self.tc = SSHClient()
-        self.tc.set_missing_host_key_policy(paramiko.RejectPolicy())
-        self.assertEqual(0, len(self.tc.get_host_keys()))
-        self.assertRaises(
-            paramiko.SSHException,
-            self.tc.connect,
-            password="pygmalion",
-            gss_kex=True,
             **self.connect_kwargs,
         )
 
@@ -734,35 +692,27 @@ class SSHClientTest(ClientTest):
 
     @patch("paramiko.client.Transport")
     def test_transport_factory_defaults_to_Transport(self, Transport):
-        sock, kex, creds, algos = Mock(), Mock(), Mock(), Mock()
+        sock, algos = Mock(), Mock()
         SSHClient().connect(
             "host",
             sock=sock,
             password="no",
-            gss_kex=kex,
-            gss_deleg_creds=creds,
             disabled_algorithms=algos,
         )
-        Transport.assert_called_once_with(
-            sock, gss_kex=kex, gss_deleg_creds=creds, disabled_algorithms=algos
-        )
+        Transport.assert_called_once_with(sock, disabled_algorithms=algos)
 
     @patch("paramiko.client.Transport")
     def test_transport_factory_may_be_specified(self, Transport):
         factory = Mock()
-        sock, kex, creds, algos = Mock(), Mock(), Mock(), Mock()
+        sock, algos = Mock(), Mock()
         SSHClient().connect(
             "host",
             sock=sock,
             password="no",
-            gss_kex=kex,
-            gss_deleg_creds=creds,
             disabled_algorithms=algos,
             transport_factory=factory,
         )
-        factory.assert_called_once_with(
-            sock, gss_kex=kex, gss_deleg_creds=creds, disabled_algorithms=algos
-        )
+        factory.assert_called_once_with(sock, disabled_algorithms=algos)
         # Safety check
         assert not Transport.called
 
