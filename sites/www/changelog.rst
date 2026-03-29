@@ -2,11 +2,13 @@
 Changelog
 =========
 
-- :support:`-` The `PKey` class family tree reorganized the
-  ``write_private_key`` and ``write_private_key_file`` methods; with other
+- :release:`5.0.0 <2026-03-30>`
+- :support:`-` The `PKey <paramiko.pkey.PKey>` class family tree reorganized
+  the ``write_private_key`` and ``write_private_key_file`` methods; with other
   recent changes, having individual implementations on the child classes made
-  no sense, so key writing is now implemented in `PKey` itself and the included
-  child classes such as `ECDSAKey` no longer define their own such methods,
+  no sense, so key writing is now implemented in `PKey <paramiko.pkey.PKey>`
+  itself and the included child classes such as `ECDSAKey
+  <paramiko.ecdsakey.ECDSAKey>` no longer define their own such methods,
   instead simply exposing their underlying cryptographic private key objects as
   ``.private_key``.
 - :feature:`-` Added a new, optional ``file_format`` keyword argument to
@@ -82,7 +84,7 @@ Changelog
   burden and we've wanted to remove them for years.
 
   Users who enjoyed the client-side demos should look at our wrapper library,
-  `Fabric <https://fabfile.org>`.
+  `Fabric <https://fabfile.org>`_.
 
   We suspect the most-used demo was ``demos/demo-server.py`` and may consider
   adding a variant of it to the actual Python package in future.
