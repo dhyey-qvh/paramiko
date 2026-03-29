@@ -1,8 +1,12 @@
 from pathlib import Path
 from unittest.mock import call, patch
 
+from cryptography.hazmat.primitives.asymmetric.ec import (
+    EllipticCurvePrivateKey,
+)
 from cryptography.hazmat.primitives.asymmetric.ed448 import Ed448PrivateKey
-from pytest import raises
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
+from pytest import mark, raises
 
 from paramiko import (
     ECDSAKey,
@@ -13,6 +17,7 @@ from paramiko import (
     RSAKey,
     UnknownKeyType,
 )
+from paramiko.pkey import OPENSSH, PEM, PrivateKey
 
 from ._util import _support
 
@@ -230,3 +235,49 @@ class PKey_:
                 "ecdsa-sha2-nistp384",
                 "ecdsa-sha2-nistp521",
             ]
+
+    class write_private_key_and_file:
+        @mark.parametrize(
+            "key_path, expected_class",
+            [
+                ("rsa.key", RSAPrivateKey),
+                ("ecdsa-256.key", EllipticCurvePrivateKey),
+                # TODO: Ed25519 after we sort it out
+            ],
+        )
+        def uses_private_key_property(
+            self, key_path: str, expected_class: PrivateKey
+        ) -> None:
+            key_obj = PKey.from_path(_support(key_path))
+            assert isinstance(key_obj.private_key, expected_class)
+
+        # TODO: Ed25519 after we sort its writing out
+        @mark.parametrize(
+            "key_class, key_kwargs, key_name",
+            [
+                (RSAKey, dict(bits=4098), "RSA"),
+                (ECDSAKey, dict(bits=384), "EC"),
+            ],
+        )
+        @mark.parametrize("key_format", [PEM, OPENSSH])
+        def can_write_multiple_formats(
+            self,
+            key_class: str,
+            key_kwargs: dict,
+            key_format: PrivateKey,
+            key_name: str,
+            tmp_path: Path,
+        ) -> None:
+            # Roundtrip-as-proof
+            temp_key = tmp_path / "my.key"
+            key = key_class.generate(**key_kwargs)
+            key.write_private_key_file(
+                filename=str(temp_key), file_format=key_format
+            )
+            read_key = PKey.from_path(temp_key)
+            assert read_key == key
+            # Paranoia seasoning
+            if key_format is PEM:
+                assert f"BEGIN {key_name} PRIVATE KEY" in temp_key.read_text()
+            elif key_format is OPENSSH:
+                assert "BEGIN OPENSSH PRIVATE KEY" in temp_key.read_text()

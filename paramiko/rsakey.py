@@ -20,6 +20,8 @@
 RSA keys.
 """
 
+from typing import Optional
+
 from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
@@ -93,6 +95,10 @@ class RSAKey(PKey):
         return self.key.key_size
 
     @property
+    def private_key(self) -> Optional[rsa.RSAPrivateKey]:
+        return self.key if isinstance(self.key, rsa.RSAPrivateKey) else None
+
+    @property
     def public_numbers(self):
         if isinstance(self.key, rsa.RSAPrivateKey):
             return self.key.private_numbers().public_numbers
@@ -164,22 +170,6 @@ class RSAKey(PKey):
             return False
         else:
             return True
-
-    def write_private_key_file(self, filename, password=None):
-        self._write_private_key_file(
-            filename,
-            self.key,
-            serialization.PrivateFormat.TraditionalOpenSSL,
-            password=password,
-        )
-
-    def write_private_key(self, file_obj, password=None):
-        self._write_private_key(
-            file_obj,
-            self.key,
-            serialization.PrivateFormat.TraditionalOpenSSL,
-            password=password,
-        )
 
     @staticmethod
     def generate(bits, progress_func=None):

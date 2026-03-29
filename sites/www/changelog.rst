@@ -2,6 +2,25 @@
 Changelog
 =========
 
+- :support:`-` The `PKey` class family tree reorganized the
+  ``write_private_key`` and ``write_private_key_file`` methods; with other
+  recent changes, having individual implementations on the child classes made
+  no sense, so key writing is now implemented in `PKey` itself and the included
+  child classes such as `ECDSAKey` no longer define their own such methods,
+  instead simply exposing their underlying cryptographic private key objects as
+  ``.private_key``.
+- :feature:`-` Added a new, optional ``file_format`` keyword argument to
+  `PKey.write_private_key <paramiko.pkey.PKey.write_private_key>` and
+  `PKey.write_private_key_file <paramiko.pkey.PKey.write_private_key_file>` to
+  allow writing out OpenSSH-style private key files in addition to the legacy
+  PEM format.
+
+  .. warning::
+    While the default format remains PEM in Paramiko 5, future major releases
+    are likely to change that default to the OpenSSH format. We recommend
+    updating any key-writing code you have to be explicit now, to insulate
+    yourself from such an update.
+
 - :support:`-` Raised the minimum modulus size in
   ``diffie-hellman-group-exchange-sha256`` key exchange from 1024 (the original
   spec's minimum) to 2048 (the contemporary minimum according to :rfc:`9142`,

@@ -27,12 +27,18 @@ import struct
 from base64 import decodebytes, encodebytes
 from binascii import unhexlify
 from hashlib import md5, sha256
+from io import RawIOBase
 from pathlib import Path
-from typing import Optional
+from typing import NamedTuple, Optional, Union
 
 import bcrypt
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import asymmetric, padding, serialization
+from cryptography.hazmat.primitives.asymmetric.ec import (
+    EllipticCurvePrivateKey,
+)
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
 from paramiko import util
@@ -84,6 +90,29 @@ class UnknownKeyType(Exception):
 
     def __str__(self):
         return f"UnknownKeyType(type={self.key_type!r}, bytes=<{len(self.key_bytes)}>)"  # noqa
+
+
+class FileFormat(NamedTuple):
+    format: serialization.PrivateFormat
+    encoding: serialization.Encoding
+
+
+# While these have no apparent interface/protocol within Cryptography, all can
+# be duck typed as eg "having .private_bytes", which we have always relied upon
+# implicitly since the switch to this library.
+PrivateKey = Union[RSAPrivateKey, EllipticCurvePrivateKey, Ed25519PrivateKey]
+
+# NOTE: considered making these part of an Enum but that was a bit
+# annoying/fussy, so this is an okay middle ground?
+PEM = FileFormat(
+    format=serialization.PrivateFormat.TraditionalOpenSSL,
+    encoding=serialization.Encoding.PEM,
+)
+OPENSSH = FileFormat(
+    format=serialization.PrivateFormat.OpenSSH,
+    encoding=serialization.Encoding.PEM,
+)
+# TODO: others as desired?
 
 
 class PKey:
@@ -459,7 +488,12 @@ class PKey:
         key = cls(file_obj=file_obj, password=password)
         return key
 
-    def write_private_key_file(self, filename, password=None):
+    def write_private_key_file(
+        self,
+        filename: str,
+        password: Optional[str] = None,
+        file_format: FileFormat = PEM,
+    ):
         """
         Write private key contents into a file.  If the password is not
         ``None``, the key is encrypted before writing.
@@ -467,26 +501,45 @@ class PKey:
         :param str filename: name of the file to write
         :param str password:
             an optional password to use to encrypt the key file
+        :param FileFormat file_format:
+            what format+encoding pair to use; defaults to the original
+            behavior, namely PEM.
 
         :raises: ``IOError`` -- if there was an error writing the file
         :raises: `.SSHException` -- if the key is invalid
         """
-        raise Exception("Not implemented in PKey")
+        self._write_private_key_file(
+            filename,
+            self.private_key,
+            file_format=file_format,
+            password=password,
+        )
 
-    def write_private_key(self, file_obj, password=None):
+    def write_private_key(
+        self,
+        file_obj: RawIOBase,
+        password: Optional[str] = None,
+        file_format: FileFormat = PEM,
+    ):
         """
         Write private key contents into a file (or file-like) object.  If the
         password is not ``None``, the key is encrypted before writing.
 
         :param file_obj: the file-like object to write into
         :param str password: an optional password to use to encrypt the key
+        :param FileFormat file_format:
+            what format+encoding pair to use; defaults to the original
+            behavior, namely PEM.
 
         :raises: ``IOError`` -- if there was an error writing to the file
         :raises: `.SSHException` -- if the key is invalid
         """
-        # TODO (backwards incompat): NotImplementedError (plus everywhere else
-        # in here)
-        raise Exception("Not implemented in PKey")
+        self._write_private_key(
+            file_obj,
+            self.private_key,
+            file_format=file_format,
+            password=password,
+        )
 
     def _read_private_key_file(self, tag, filename, password=None):
         """
@@ -743,21 +796,13 @@ class PKey:
             raise SSHException(str(e))
         return tuple(arr)
 
-    def _write_private_key_file(self, filename, key, format, password=None):
-        """
-        Write an SSH2-format private key file in a form that can be read by
-        paramiko or openssh.  If no password is given, the key is written in
-        a trivially-encoded format (base64) which is completely insecure.  If
-        a password is given, DES-EDE3-CBC is used.
-
-        :param str tag:
-            ``"RSA"`` or etc, the tag used to mark the data block.
-        :param filename: name of the file to write.
-        :param bytes data: data blob that makes up the private key.
-        :param str password: an optional password to use to encrypt the file.
-
-        :raises: ``IOError`` -- if there was an error writing the file.
-        """
+    def _write_private_key_file(
+        self,
+        filename: str,
+        key: PrivateKey,
+        file_format: FileFormat,
+        password: Optional[str] = None,
+    ):
         # Ensure that we create new key files directly with a user-only mode,
         # instead of opening, writing, then chmodding, which leaves us open to
         # CVE-2022-24302.
@@ -775,9 +820,15 @@ class PKey:
             # Yea, you still gotta inform the FLO that it is in "write" mode.
             "w",
         ) as f:
-            self._write_private_key(f, key, format, password=password)
+            self._write_private_key(f, key, file_format, password=password)
 
-    def _write_private_key(self, f, key, format, password=None):
+    def _write_private_key(
+        self,
+        f: RawIOBase,
+        key: PrivateKey,
+        file_format: FileFormat,
+        password: Optional[str] = None,
+    ):
         if password is None:
             encryption = serialization.NoEncryption()
         else:
@@ -785,7 +836,7 @@ class PKey:
 
         f.write(
             key.private_bytes(
-                serialization.Encoding.PEM, format, encryption
+                file_format.encoding, file_format.format, encryption
             ).decode()
         )
 
