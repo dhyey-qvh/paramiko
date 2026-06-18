@@ -7,6 +7,10 @@ on:
         description: EnQrypta API URL
         required: true
         type: string
+      notification-email:
+        description: Email recipient
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -17,3 +21,5 @@ jobs:
     uses: dhyey-qvh/enqrypta-actions/.github/workflows/enqrypta-opengrep.yml@enqrypta-opengrep-workflow-v1
     with:
       api-url: ${{ inputs.api-url }}
+      notify-on-complete: true
+      notification-email: ${{ inputs.notification-email }}
