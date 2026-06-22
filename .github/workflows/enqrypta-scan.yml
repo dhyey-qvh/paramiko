@@ -4,12 +4,10 @@ on:
   workflow_dispatch:
     inputs:
       api-url:
-        description: EnQrypta API URL
         required: true
         type: string
       notification-email:
-        description: Email recipient
-        required: true
+        required: false
         type: string
 
 permissions:
@@ -21,5 +19,5 @@ jobs:
     uses: dhyey-qvh/enqrypta-actions/.github/workflows/enqrypta-opengrep.yml@enqrypta-opengrep-workflow-v1
     with:
       api-url: ${{ inputs.api-url }}
-      notify-on-complete: true
+      notify-on-complete: ${{ inputs.notification-email != '' }}
       notification-email: ${{ inputs.notification-email }}
