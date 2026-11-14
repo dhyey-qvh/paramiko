@@ -1,0 +1,31 @@
+# Throwaway test artifacts for the EnQrypta classification API. Not used by anything.
+
+## RSA-2048 public key
+-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzJ5kfP8dVxKmezsV5mcG
+bBLpe9fv84UjugMgJOCQ48YfsGvWFWpeDR/sMpMS0hExqmv8prEjhwtwCAZc5Q3R
+gDyw9f/wpJUXtAT3nPYQE4Vb3AVlReQXgtDNAoTvgdDwidbUpHUlGsiFnRq1DasC
+rPHnZ5pB4WQStMxoabr0rrJaYqf1wbiUfd4Zbm4waSbYaUuND4cuG4XSke/qkG6P
+MXB3oSiD2HANsADnGb87ThhJJAiHbxCZPNVqFlibasERA+y3Ss9R9Hv65SGHD8rD
+w/MFlhzvQYP+BcdZktj0O/Zo8lk3MAvjZr5CPpWayXVm2Px94bL0K0ei83f7j8jh
+4wIDAQAB
+-----END PUBLIC KEY-----
+
+## EC P-256 self-signed certificate
+-----BEGIN CERTIFICATE-----
+MIIBlTCCATugAwIBAgIUEQkBP7N0weGgSeoQQvzDRFHkEXowCgYIKoZIzj0EAwIw
+IDEeMBwGA1UEAwwVZW5xcnlwdGEtdGVzdC5leGFtcGxlMB4XDTI2MTExNDE0MTgw
+NloXDTI3MTExNDE0MTgwNlowIDEeMBwGA1UEAwwVZW5xcnlwdGEtdGVzdC5leGFt
+cGxlMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE7Nr4ErC3+/VYa1vKqhKY4yWu
+kIXaQMJ6ANs5NoZKzhzDM/9UzKJ6qi3VlicgjpJ/iExkb95aC7MyXqlebuiDvKNT
+MFEwHQYDVR0OBBYEFMwDNDlL/6wgaWrQpcl89mIYbC2XMB8GA1UdIwQYMBaAFMwD
+NDlL/6wgaWrQpcl89mIYbC2XMA8GA1UdEwEB/wQFMAMBAf8wCgYIKoZIzj0EAwID
+SAAwRQIhAJV0BAa6KcOBaU6vnNGTUyzcArP4u7C0nZXadCSG+7V8AiBh6QKl6k3f
+omsggcxkTisuUqfXt2qNo0TwXYR21pbiqg==
+-----END CERTIFICATE-----
+
+## Ed25519 OpenSSH public key
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGwkCiEnl3Nz7XkGnQ0e2HXrj6jB0sUUtMVEAiYc7x9j enqrypta-test
+
+## RS256 JWT
+eyJhbGci••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••
